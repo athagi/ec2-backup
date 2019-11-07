@@ -1,0 +1,28 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+    document: 
+        Type: "AWS::SSM::Document"
+        Properties: 
+            Content: 
+                schemaVersion: '0.3'
+                description: Create AMI for backup
+                parameters:
+                    InstanceId:
+                        type: String
+                        description: (Required) EC2 Instance ID to backup
+                mainSteps:
+                    -
+                        name: createImage
+                        action: 'aws:createImage'
+                        maxAttempts: 3
+                        onFailure: Abort
+                        inputs:
+                            InstanceId: '{{ InstanceId }}'
+                            ImageName: 'backup_{{ global:DATE_TIME }}_{{ InstanceId }}'
+                            NoReboot: true
+                            ImageDescription: 'Created by ASM on {{ global:DATE_TIME }} UTC from {{ InstanceId }}'
+                outputs:
+                    - createImage.ImageId
+
+            DocumentType: Automation
