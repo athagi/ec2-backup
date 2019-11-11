@@ -5,7 +5,7 @@ Resources:
         Type: "AWS::SSM::Document"
         Properties: 
             Content: 
-                schemaVersion: '0.3'
+                schemaVersion: '2.2'
                 description: Create AMI for backup
                 parameters:
                     InstanceId:
