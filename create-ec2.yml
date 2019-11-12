@@ -91,3 +91,7 @@ Resources:
         - Key: StackName
           Value: 
             Ref: AWS::StackName
+        - Key: Name
+          Value: instance01
+        - Key: AMI-Backup
+          Value: true
