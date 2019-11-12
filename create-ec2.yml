@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: create EC2 instance
+Parameters:
+  InstanceKeyName:
+    Type: String
+    Description: keyName to login created instance
+  MyIP:
+    Type: String
+    Description: IP that allowed by security group
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 192.168.0.0/16
+      Tags:
+        - Key: Purpose
+          Value: 
+            Ref: AWS::StackName
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 'ap-northeast-1a'
+      CidrBlock: '192.168.1.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: StackName
+          Value: 
+            Ref: AWS::StackName
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: StackName
+          Value: 
+            Ref: AWS::StackName
+  IgwAttach:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: StackName
+          Value: 
+            Ref: AWS::StackName
+  ChangePublicRouteTable:
+    Type: AWS::EC2::Route
+    DependsOn: 'IgwAttach'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      # defalt gateway
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  SubnetPublicRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+  SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: SecurityGroupForSSH
+      GroupDescription: security group for test instance
+      VpcId: !Ref VPC
+      Tags:
+        - Key: 'Name'
+          Value: 'TESTSG'
+        - Key: StackName
+          Value: AWS::StackName
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: !Ref MyIP
+  MyEC2Instance: #An inline comment
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      ImageId: "ami-0064e711cbc7a825e" # amazon linux2
+      InstanceType: t2.nano
+      KeyName: 
+        Ref: InstanceKeyName
+      Monitoring: false
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: StackName
+          Value: 
+            Ref: AWS::StackName
