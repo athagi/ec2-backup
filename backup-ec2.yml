@@ -1,7 +1,7 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 Resources:
-    document: 
+    ssmBackupDocument: 
         Type: "AWS::SSM::Document"
         Properties: 
             Content: 
@@ -10,7 +10,11 @@ Resources:
                 parameters:
                     InstanceId:
                         type: String
-                        description: (Required) EC2 Instance ID to backup
+                        description: (Required) The ID of the Amazon EC2 instance.
+                    NoReboot:
+                        type: Boolean
+                        description: (Optional) Do not reboot the instance before creating the image.
+                        default: true
                 mainSteps:
                     -
                         name: createImage
@@ -20,9 +24,119 @@ Resources:
                         inputs:
                             InstanceId: '{{ InstanceId }}'
                             ImageName: 'backup_{{ global:DATE_TIME }}_{{ InstanceId }}'
-                            NoReboot: true
+                            NoReboot: '{{ NoReboot }}'
                             ImageDescription: 'Created by ASM on {{ global:DATE_TIME }} UTC from {{ InstanceId }}'
                 outputs:
                     - createImage.ImageId
-
             DocumentType: Automation
+            Tags:
+                - Key: StackName
+                  Value: !Ref AWS::StackName
+    EC2RoleForSSM:
+        Type: AWS::IAM::Role
+        Properties: 
+            RoleName: SSMManagedInstanceRoleForBackup
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    -
+                        Effect: "Allow"
+                        Principal:
+                            Service:
+                            - "ec2.amazonaws.com" 
+                        Action: 
+                            - "sts:AssumeRole"
+            ManagedPolicyArns: 
+                - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+            MaxSessionDuration: 3600
+            Tags:
+                - Key: StackName
+                  Value: !Ref AWS::StackName
+    EC2InstanceProfileForSSM:
+        Type: AWS::IAM::InstanceProfile
+        Properties: 
+            InstanceProfileName: SSMManagedInstanceProfileForBackup
+            Roles: 
+                - !Ref EC2RoleForSSM
+    SSMMaintenanceWindowRoleForEC2Backup:
+        Type: AWS::IAM::Role
+        Properties: 
+            RoleName: SSMMaintenanceWindowRoleForEC2Backup
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    -
+                        Effect: "Allow"
+                        Principal:
+                            Service:
+                                - "ec2.amazonaws.com" 
+                                - "ssm.amazonaws.com"
+                        Action: 
+                            - "sts:AssumeRole"
+            ManagedPolicyArns: 
+                - arn:aws:iam::aws:policy/service-role/AmazonSSMMaintenanceWindowRole
+            MaxSessionDuration: 3600
+            Tags:
+                - Key: StackName
+                  Value: !Ref AWS::StackName
+    SSMMaintenanceWindowPolicyForEC2:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: SSMMaintenanceWindowPolicyForEC2
+            PolicyDocument: 
+                Version: "2012-10-17"
+                Statement:
+                  -
+                    Effect: "Allow"
+                    Action:
+                      - "ec2:*"
+                    Resource: "*"
+            Roles: 
+                - !Ref SSMMaintenanceWindowRoleForEC2Backup
+    BackupMaintenanceWindow:
+        Type: AWS::SSM::MaintenanceWindow
+        Properties:
+            Name: CreateAMI
+            AllowUnassociatedTargets: false
+            Cutoff: 0
+            Description: Create AMI from running instances by tag
+            Duration: 1
+            Schedule: cron(05 4 * * ? *)
+            ScheduleTimezone: Asia/Tokyo
+            Tags:
+                - Key: StackName
+                  Value: !Ref AWS::StackName
+    BackupMaintenanceWindowTarget:
+        Type: AWS::SSM::MaintenanceWindowTarget
+        Properties:
+            Description: target for backup
+            Name: backupTargets
+            ResourceType: INSTANCE
+            Targets:
+                - Key: tag:AMI-Backup
+                  Values:
+                    - true
+            WindowId: !Ref BackupMaintenanceWindow
+    BackupMaintenanceWindowTask:
+        Type: AWS::SSM::MaintenanceWindowTask
+        Properties:
+            MaxConcurrency: 2
+            MaxErrors: 1
+            Priority: 10
+            TaskArn: !Ref ssmBackupDocument
+            WindowId: !Ref BackupMaintenanceWindow
+            Targets:
+                - Key: WindowTargetIds
+                  Values:
+                    - !Ref BackupMaintenanceWindowTarget
+            TaskType: AUTOMATION
+            ServiceRoleArn: !GetAtt SSMMaintenanceWindowRoleForEC2Backup.Arn
+            TaskInvocationParameters:
+                MaintenanceWindowAutomationParameters:
+                    Parameters: 
+                        InstanceId: 
+                            - '{{ TARGET_ID }}'
+                        NoReboot:
+                            - true
+    
+        

@@ -87,6 +87,7 @@ Resources:
       SecurityGroupIds:
         - !GetAtt SecurityGroup.GroupId
       SubnetId: !Ref PublicSubnet
+      IamInstanceProfile: SSMManagedInstanceProfileForBackup
       Tags:
         - Key: StackName
           Value: 
