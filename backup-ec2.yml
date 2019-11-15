@@ -15,8 +15,11 @@ Resources:
                         type: Boolean
                         description: (Optional) Do not reboot the instance before creating the image.
                         default: true
+                    Generation:
+                        type: String
+                        description: (Optional) Backup generation
                 mainSteps:
-                    -
+                    - 
                         name: createImage
                         action: 'aws:createImage'
                         maxAttempts: 3
@@ -26,6 +29,15 @@ Resources:
                             ImageName: 'backup_{{ global:DATE_TIME }}_{{ InstanceId }}'
                             NoReboot: '{{ NoReboot }}'
                             ImageDescription: 'Created by ASM on {{ global:DATE_TIME }} UTC from {{ InstanceId }}'
+                    -       
+                        name: deleteOldAMI
+                        action: aws:invokeLambdaFunction
+                        maxAttempts: 3
+                        timeoutSeconds: 20
+                        onFailure: Abort
+                        inputs:
+                            FunctionName: {{ami-remove-function}}
+                            Payload: '{"instance_id": "{{ InstanceId }}", "generation": "{{ Generation }}" }'
                 outputs:
                     - createImage.ImageId
             DocumentType: Automation
@@ -139,4 +151,40 @@ Resources:
                         NoReboot:
                             - true
     
-        
+    DeregesterAMIPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: DeregesterAMIPolicy
+            PolicyDocument: 
+                Version: "2012-10-17"
+                Statement:
+                  -
+                    Effect: "Allow"
+                    Action:
+                        - "ec2:DescribeImages"
+                        - "ec2:DeregisterImage"
+                    Resource: "*"
+            Roles: 
+                - !Ref LambdaRoleForDeregisterAMI
+    LambdaRoleForDeregisterAMI:
+        Type: AWS::IAM::Role
+        Properties: 
+            RoleName: LambdaRoleForDeregisterAMI
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    -
+                        Effect: "Allow"
+                        Principal:
+                            Service:
+                                - "lambda.amazonaws.com"
+                        Action: 
+                            - "sts:AssumeRole"
+            ManagedPolicyArns: 
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+            MaxSessionDuration: 3600
+            Tags:
+                - Key: StackName
+                  Value: !Ref AWS::StackName
+
+

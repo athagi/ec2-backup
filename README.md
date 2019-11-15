@@ -9,4 +9,4 @@ aws cloudformation create-stack --template-body file://backup-ec2.yml --stack-na
 Create test instance
 ```
 aws cloudformation create-stack --stack-name {{ STACK_NAME }} --template-body file://create-ec2.yml --parameters ParameterKey=InstanceKeyName,ParameterValue={{ KEY_NAME }},UsePreviousValue=true,ResolvedValue=string ParameterKey=MyIP,ParameterValue={{ MY_IP }}/32,UsePreviousValue=true,ResolvedValue=string
-```
+```zip -r remove-ami.zip ./lambda_function.py
