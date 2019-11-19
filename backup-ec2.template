@@ -1,5 +1,10 @@
 
 AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  BackupGeneration:
+    Description: Generation of AMI backup.
+    Type: String
+    Default: "7"
 Resources:
     ssmBackupDocument: 
         Type: "AWS::SSM::Document"
@@ -18,6 +23,7 @@ Resources:
                     Generation:
                         type: String
                         description: (Optional) Backup generation
+                        default: !Sub ${BackupGeneration}
                 mainSteps:
                     - 
                         name: createImage
@@ -36,7 +42,7 @@ Resources:
                         timeoutSeconds: 20
                         onFailure: Abort
                         inputs:
-                            FunctionName: {{ami-remove-function}}
+                            FunctionName: !Ref RemoveAMIFunction #{{ami-remove-function}}
                             Payload: '{"instance_id": "{{ InstanceId }}", "generation": "{{ Generation }}" }'
                 outputs:
                     - createImage.ImageId
@@ -186,5 +192,11 @@ Resources:
             Tags:
                 - Key: StackName
                   Value: !Ref AWS::StackName
-
+    RemoveAMIFunction:
+        Type: AWS::Lambda::Function
+        Properties:
+            Code: remove_ami/
+            Handler: lambda_function.lambda_handler
+            Runtime: python3.7
+            Role: !GetAtt LambdaRoleForDeregisterAMI.Arn
 

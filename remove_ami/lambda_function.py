@@ -2,11 +2,17 @@ import json
 import boto3
 import datetime
 
+DEFAULT_GENERATION = 3
+
 # in 3 sec, enable to deregister max 4 amis.
 def lambda_handler(event, context):
     ec2 = boto3.client('ec2')
     if "generation" in event.keys():
-        generation = event["generation"]
+        try:
+            generation = int(event["generation"])
+        except:
+            generation = DEFAULT_GENERATION
+            
     instance_id = event["instance_id"]
     
     search_name = "backup_*_" + instance_id
