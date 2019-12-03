@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: This CloudFormation template to create S3 Bucket
+Description: Create S3 Bucket to deploy lambda function
  
 Parameters:
   S3BucketName:
